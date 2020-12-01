@@ -1,6 +1,7 @@
 <?php
+
 /**
- * 收信
+  收信
  */
 class ReceiveMailHelper
 {
