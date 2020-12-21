@@ -3,6 +3,7 @@
 /**
  * 陣列相關的擴充功能
  * 
+ * @version 0.2.1 修正columns遇上物件陣列會出錯
  * @version 0.2.0 加入except_columns
  * @version 0.1.2 讓group_by的不訂參數可以吃單一陣列
  * @version 0.1.1 修正call_user_func_array在static下的調整
@@ -50,8 +51,9 @@ class ArrExp
             if ($keys) {
                 $tmp = array();
                 foreach ($keys as $key) {
-                    $tmp[$key] = $v[$key];
+                    $tmp[$key] = is_object($v) ? $v->$key : $v[$key];
                 }
+                if (is_object($v)) $tmp = (object)$tmp;
             } else {
                 $tmp = $v;
             }
