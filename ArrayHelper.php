@@ -29,7 +29,7 @@ class ArrayHelper
 
         // 顯示標題
         $html .=  '<tr bgcolor="#dddddd">';
-        $tmp = array_keys(current($this->arr));
+        $tmp = array_keys((array)current($this->arr));
         foreach ($tmp as $mn) {
             $html .=  "<th>{$mn}</th>";
         }
@@ -110,9 +110,14 @@ class ArrayHelper
         return $this;
     }
 
+    /** 對多欄位進行排序
+     * 範例:(new ArrayHelper($data))->sort_by(['a'=>SORT_DESC, 'c', 'b'])->resultToTable();
+     * @param array $keys [ 'a', 'b'=>'ASC', 'b'=>'<', 'b'=>SORT_ASC] 說明:{ '<' / ASC / 空白}:小到大排序，{ '>' / DESC }:大到小排序
+     * @return void
+     */
     public function sort_by($keys)
     {
-        $this->arr = ArrExp::sort_by($this->arr, $keys);
+        ArrExp::sort_by($this->arr, $keys);
         return $this;
     }
 
@@ -125,6 +130,17 @@ class ArrayHelper
     public function filter($callback = null, $flag = 0)
     {
         $this->arr = array_filter($this->arr, $callback, $flag);
+        return $this;
+    }
+
+    /** filter，指定單組key-value
+     * @param string $keyName
+     * @param string $value
+     * @return ArrayHelper
+     */
+    public function find($keyName = '', $value = '')
+    {
+        $this->arr = ArrExp::find($this->arr, $keyName, $value);
         return $this;
     }
 
@@ -155,9 +171,26 @@ class ArrayHelper
             // 合併成單一字串
             $out[$key] = join($glue, $out[$key]);
         }
-
         $this->arr = &$out;
-
         return $this;
+    }
+
+
+    /** 將指定屬性值作為key，若有相同的屬性值會發生覆蓋，不覆蓋請用group_by
+     *
+     * @param array $arr 要變更的資料陣列
+     * @param string $primaryName 屬性名
+     * @return array 回傳編輯完畢的$arr
+     */
+    public function reset_key($primaryName)
+    {
+        ArrExp::reset_key($this->arr, $primaryName);
+        return $this;
+    }
+
+
+    public function count()
+    {
+        return count($this->arr);
     }
 }
