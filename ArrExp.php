@@ -3,6 +3,8 @@
 /**
  * 陣列相關的擴充功能
  * 
+ * @version 0.3.0 加入find,reset_key功能
+ * @version 0.2.2 修正sort_by無法排序多個欄位的問題
  * @version 0.2.1 修正columns遇上物件陣列會出錯
  * @version 0.2.0 加入except_columns
  * @version 0.1.2 讓group_by的不訂參數可以吃單一陣列
@@ -11,15 +13,6 @@
  */
 class ArrExp
 {
-
-    // public static function equal(array $arr1, array $arr2){
-
-    //     if(gettype($arr1) != gettype($arr2)) return false;
-    //     if(count($arr1) != count($arr2)) return false;
-
-
-    // }
-
     /** 排除重複，可用於二維陣列與物件陣列 */
     public static function unique(array $arr)
     {
@@ -77,7 +70,7 @@ class ArrExp
      */
     public static function except_columns(&$array, $keys)
     {
-        if(!isset($keys)) return $array;
+        if (!isset($keys)) return $array;
 
         if (!is_array($keys))
             $key = explode(',', $keys);
@@ -144,6 +137,27 @@ class ArrExp
         return $grouped;
     }
 
+    /** filter，指定key-value
+     * @param array $arr
+     * @param string $keyName
+     * @param string $value
+     * @return array
+     */
+    public static function find(array $arr, $keyName = '', $value = '')
+    {
+        $result = array_filter($arr, function ($v) use ($keyName, $value) {
+            if (is_object($v)) {
+                return $v->$keyName == $value;
+            }
+
+            if (is_array($v)) {
+                return $v[$keyName] == $value;
+            }
+
+            return false;
+        });
+        return $result;
+    }
     // public static function group_by2(array $arr,array $keys)
     // {
     //     $result = [];
@@ -155,35 +169,121 @@ class ArrExp
     // }
 
 
-    public static function sort_by(array $arr, $keys)
+    /** 對多欄位進行排序
+     * 範例 ArrExp::sort_by($array, ['a','b'=>'>','c'=>'DESC'])
+     *
+     * @param array $arr 資料陣列
+     * @param array $sortKeyList [  'a'=>'', 'a'=>'ASC', 'b'=>'<', 'b'=>SORT_ASC] { '<' / ASC / 空白}:小到大排序，{ '>' / DESC }:大到小排序
+     * @return array 回傳變更後的傳入參數$arr
+     */
+    public static function sort_by(array &$arr, array $sortKeyList)
     {
+        if (count($sortKeyList) == 0 || count($arr) == 0) return $arr;
 
-        // 整理要排序的屬性
-        if (is_object($keys)) return $arr;
-        if (!is_array($keys))
-            $keyList = explode(',', $keys); // 分割
-        $keyList = array_keys(array_flip($keyList)); // 排除重複
-        $keyList = array_reverse($keyList); // 從最後面開始排序，所以要反轉
-
-        $result = &$arr; // 節省一次占用空間
         $first = current($arr); // 拿來辨識物件還是陣列用，因為屬性存取的方式不一樣
 
-        // 開始排序
-        if (is_object($first))
-            foreach ($keyList as $key) {
-                if (isset($first->{$key}))
-                    usort($result, function ($a, $b) use ($key) {
-                        return strcmp($a->{$key}, $b->{$key});
-                    });
+        $func_setFirstOfProp = function (&$param, &$sortKey, &$sortValue, &$data) use (&$first) {
+
+            // first of field
+            if (!array_key_exists($sortKey, $param)) {
+                $param[$sortKey] = [];
+
+                // 一般文字用自然排序(數字字串不算)，其他用一般排序
+                $firstValue = is_object($first) ? $first->$sortKey : $first[$sortKey];
+                if (is_string($firstValue) && !is_numeric($firstValue))
+                    $param[] = SORT_NATURAL;
+                else
+                    $param[] = SORT_REGULAR;
+
+                // 該欄位正序倒序
+                switch ($sortValue) {
+                    case SORT_DESC:
+                    case 'DESC':
+                    case 'desc':
+                    case '>':
+                        $param[] = SORT_DESC;
+                        break;
+                    case '':
+                    case SORT_ASC:
+                    case 'ASC':
+                    case 'asc':
+                    case '<':
+                    default:
+                        $param[] = SORT_ASC;
+                        break;
+                }
             }
-        else if (is_array($first))
-            foreach ($keyList as $key) {
-                if (array_key_exists($key, $first))
-                    usort($result, function ($a, $b) use ($key) {
-                        return strcmp($a[$key], $b[$key]);
-                    });
+        };
+
+        // 整理排序的資訊
+        $sortList = [];
+        $keys = array_keys((array)$first);
+        foreach ($sortKeyList as $sortKey => $sortValue) {
+
+            // 假若傳入不是key-value就轉成key-value
+            if (is_int($sortKey) && is_string($sortValue)) {
+                $sortKey = $sortValue;
+                $sortValue = '';
             }
 
-        return $result;
+            // 若要排序的目標欄位不存在就拿掉
+            if (in_array($sortKey, $keys))
+                $sortList[$sortKey] = $sortValue;
+            else
+                unset($sortKeyList[$sortKey]);
+        }
+        $sortKeyList = &$sortList;
+        if (count($sortKeyList) == 0) return $arr;
+
+        // 建立array_multisort的參數
+        $param = [];
+        if (is_object($first)) {
+            foreach ($sortKeyList as $sortKey => $sortValue) {
+                foreach ($arr as $arrIndex => $arrValue) {
+                    $func_setFirstOfProp($param, $sortKey, $sortValue, $arrValue);
+                    $param[$sortKey][] = &$arrValue->$sortKey;
+                }
+            }
+        } else {
+            foreach ($sortKeyList as $sortKey => $sortValue) {
+                foreach ($arr as $arrIndex => $arrValue) {
+                    $func_setFirstOfProp($param, $sortKey, $sortValue, $arrValue);
+                    $param[$sortKey][] = $arrValue[$sortKey];
+                }
+            }
+        }
+        $param[] = &$arr; // 最後一個放要回傳的結果
+
+        $result = call_user_func_array('array_multisort', $param);
+
+        return $arr;
+    }
+
+    /** 將指定屬性值作為key，若有相同的屬性值會發生覆蓋，不覆蓋請用group_by
+     *
+     * @param array $arr 要變更的資料陣列
+     * @param string $primaryName 屬性名
+     * @return array 回傳編輯完畢的$arr
+     */
+    public static function reset_key(array &$arr, $primaryName)
+    {
+        $result = [];
+
+        if (is_array($arr)) {
+            foreach ($arr as $key => $value) {
+                if (is_array($value) && array_key_exists($primaryName, $value))
+                    $result[$value[$primaryName]] = &$value;
+                else if (is_object($value) && property_exists($value, $primaryName))
+                    $result[$value->$primaryName] = &$value;
+                else
+                    $result[] = $value;
+            }
+        }
+
+        if (is_object($arr)) {
+            $result[$arr->$primaryName] = &$arr;
+        }
+        $arr = $result;
+        return $arr;
     }
 }
