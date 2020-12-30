@@ -3,6 +3,7 @@
 /**
  * 陣列相關的擴充功能
  * 
+ * @version 0.3.0 加入find,reset_key,transpose功能
  * @version 0.3.0 加入find,reset_key功能
  * @version 0.2.2 修正sort_by無法排序多個欄位的問題
  * @version 0.2.1 修正columns遇上物件陣列會出錯
@@ -285,5 +286,30 @@ class ArrExp
         }
         $arr = $result;
         return $arr;
+    }
+    
+    /** 轉置陣列，將二維陣列進行轉置陣
+     *
+     * @param array $arr 不會變更此陣列，傳址僅為了不再重複copy一次陣列，節省記憶體空間
+     * @return array
+     */
+    function transpose(&$arr)
+    {
+        // 建立轉置的陣列大小
+        $rowCnt = count($arr);
+        $ColCnt = count(current($arr));
+        $result = array_fill(0, $ColCnt, []);
+        foreach ($result as $key => $value) {
+            $result[$key] =  array_fill(0, $rowCnt, '');
+        }
+
+        // 開始轉置
+        for ($i = 0; $i < $rowCnt; $i++) {
+            for ($j = 0; $j < $ColCnt; $j++) {
+                $result[$j][$i] = $arr[$i][$j];
+            }
+        }
+
+        return $result;
     }
 }
