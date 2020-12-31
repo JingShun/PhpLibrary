@@ -4,7 +4,6 @@
  * 陣列相關的擴充功能
  * 
  * @version 0.3.0 加入find,reset_key,transpose功能
- * @version 0.3.0 加入find,reset_key功能
  * @version 0.2.2 修正sort_by無法排序多個欄位的問題
  * @version 0.2.1 修正columns遇上物件陣列會出錯
  * @version 0.2.0 加入except_columns
@@ -273,21 +272,20 @@ class ArrExp
         if (is_array($arr)) {
             foreach ($arr as $key => $value) {
                 if (is_array($value) && array_key_exists($primaryName, $value))
-                    $result[$value[$primaryName]] = &$value;
+                    $result[$value[$primaryName]] = $value;
                 else if (is_object($value) && property_exists($value, $primaryName))
-                    $result[$value->$primaryName] = &$value;
+                    $result[$value->$primaryName] = $value;
                 else
                     $result[] = $value;
             }
         }
 
         if (is_object($arr)) {
-            $result[$arr->$primaryName] = &$arr;
+            $result[$arr->$primaryName] = $arr;
         }
-        $arr = $result;
-        return $arr;
+        return $result;
     }
-    
+
     /** 轉置陣列，將二維陣列進行轉置陣
      *
      * @param array $arr 不會變更此陣列，傳址僅為了不再重複copy一次陣列，節省記憶體空間
