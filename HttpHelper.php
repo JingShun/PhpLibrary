@@ -57,7 +57,13 @@ class HttpHelper
 
         // 導入使用者設定
         foreach ($curlopt as $key => $value) {
-            curl_setopt($curl, $key, $value);
+            if (is_numeric($key)) {
+                curl_setopt($curl, $key, $value);
+            } else if (is_string($key)) {
+                if (strpos($key, 'CURLOPT_') === false)
+                    $key = 'CURLOPT_' . $key;
+                curl_setopt($curl, constant($key), $value);
+            }
         }
 
         $result['output'] = curl_exec($curl);
