@@ -3,6 +3,7 @@
 /**
  * 陣列相關的擴充功能
  * 
+ * @version 0.3.1 重寫group_by多key方法
  * @version 0.3.0 加入find,reset_key,transpose功能
  * @version 0.2.2 修正sort_by無法排序多個欄位的問題
  * @version 0.2.1 修正columns遇上物件陣列會出錯
@@ -25,7 +26,7 @@ class ArrExp
     }
 
     /**
-     * 返回数组中指定多列
+     * 返回数组中指定多個欄位
      * @see https://blog.csdn.net/fdipzone/article/details/78071676
      *
      * @param  Array  $input       需要取出數組列的多維數組
@@ -35,18 +36,19 @@ class ArrExp
      */
     public static function columns(array $input, $column_keys = null, $index_key = null)
     {
-        if (!is_array($input)) return [];
+        if (!is_array($input) || is_null($column_keys)) return $input;
         $result = array();
 
-        $keys = isset($column_keys) ? (is_array($column_keys) ? $column_keys : explode(',', $column_keys)) : array();
+        $keys =  (is_array($column_keys) ? $column_keys : explode(',', $column_keys));
+        $isObj = is_object(current($input));
         foreach ($input as $k => $v) {
             // 指定返回列
             if ($keys) {
                 $tmp = array();
                 foreach ($keys as $key) {
-                    $tmp[$key] = is_object($v) ? $v->$key : $v[$key];
+                    $tmp[$key] = $isObj ? $v->$key : $v[$key];
                 }
-                if (is_object($v)) $tmp = (object)$tmp;
+                if ($isObj) $tmp = (object)$tmp;
             } else {
                 $tmp = $v;
             }
@@ -61,8 +63,7 @@ class ArrExp
     }
 
     /**
-     * 移除数组中指定多列
-     * @see https://blog.csdn.net/fdipzone/article/details/78071676
+     * 移除数组中指定多個欄位
      *
      * @param  Array  $input       需要取出數組列的多維數組
      * @param  String|Array $column_keys 要移除的列名，傳入陣列或逗號分隔，如不傳則返回所有列
@@ -73,68 +74,51 @@ class ArrExp
         if (!isset($keys)) return $array;
 
         if (!is_array($keys))
-            $key = explode(',', $keys);
+            $keys = explode(',', $keys);
 
-        $tmp = array_flip($keys);
-        $tmp2 = array_diff_key($array, $tmp);
 
         return array_diff_key($array, array_flip($keys));
     }
 
     /**
-     * Groups an array by a given key. Any additional keys will be used for grouping the next set of sub-arrays.
-     * <p>example :  $grouped = array_group_by($records, 'state', 'city');</p>
-     * 
-     * @author Jake Zatecky (https://github.com/jakezatecky/array_group_by/tree/v1.1.0)
-     *
-     * @param array $arr     The array to be grouped.
-     * @param mixed $key,... A set of keys to group by.
-     *
-     * @return array
+     * 陣列群組
+     * @param array $arr
+     * @param array|string|int|float|double|callable $groupKeys
+     * @return void
      */
-    public static function group_by(array $arr, $key)
+    public static function group_by(array &$arr, $groupKeys)
     {
         if (!is_array($arr)) {
-            trigger_error('group_by(): The first argument should be an array', E_USER_ERROR);
+            return false;
         }
-        if (!is_string($key) && !is_int($key) && !is_float($key) && !is_callable($key)) {
-            trigger_error('group_by(): The key should be a string, an integer, a float, or a function', E_USER_ERROR);
-        }
-        // 陣列自動轉成不定參數
-        if (is_array($key)) {
-            return call_user_func_array('self::group_by', $key);
-        }
+        if (empty($groupKeys)) return $arr;
+        if (is_object($groupKeys)) $groupKeys = (array)$groupKeys;
+        if (is_string($groupKeys)) $groupKeys = explode(',', $groupKeys);
+        if (is_int($groupKeys) || is_float($groupKeys) || is_double($groupKeys)) $groupKeys = [$groupKeys];
 
-        $isFunction = !is_string($key) && is_callable($key);
+        $result = [];
 
-        // Load the new array, splitting by the target key
-        $grouped = [];
-        foreach ($arr as $value) {
-            $groupKey = null;
-
-            if ($isFunction) {
-                $groupKey = $key($value);
-            } else if (is_object($value)) {
-                $groupKey = $value->{$key};
-            } else {
-                $groupKey = isset($value[$key]) ? $value[$key] : '';
+        if (!is_callable($groupKeys)) {
+            $groupKey = current($groupKeys);
+            $secondKey = count($groupKeys) > 1 ? $groupKeys[1] : '';
+            $result = array_flip(array_values(array_column($arr, $groupKey)));
+            foreach ($result as $groupValue => $value) {
+                $result[$groupValue] = array_values(array_filter($arr, function ($v) use ($groupKey, $groupValue) {
+                    return $v[$groupKey] == $groupValue;
+                }));
             }
-
-            $grouped[$groupKey][] = $value;
-        }
-
-        // Recursively build a nested grouping if more parameters are supplied
-        // Each grouped array value is grouped according to the next sequential key
-        if (func_num_args() > 2) {
-            $args = func_get_args();
-
-            foreach ($grouped as $groupKey => $value) {
-                $params = array_merge([$value], array_slice($args, 2, func_num_args()));
-                $grouped[$groupKey] = call_user_func_array('self::group_by', $params);
+            if (!empty($secondKey)) {
+                foreach ($result as $k => $v) {
+                    $result[$k] = self::group_by($result[$k], array_slice($groupKeys, 1));
+                }
+            }
+        } else {
+            foreach ($arr as $key => $value) {
+                $groupKey = $groupKeys($value);
+                $result[$groupKey][] = &$arr[$key];
             }
         }
-
-        return $grouped;
+        return $result;
     }
 
     /** filter，指定key-value
@@ -158,15 +142,6 @@ class ArrExp
         });
         return $result;
     }
-    // public static function group_by2(array $arr,array $keys)
-    // {
-    //     $result = [];
-    //     $keys = self::unique(array_filter($arr, function($v){return (isset($v) && trim($v) !== '');}));
-    //     foreach ($arr as $row ) {
-    //         $result[$row[$keys[0]]] = $row;
-    //     }
-    //     return $result;
-    // }
 
 
     /** 對多欄位進行排序
