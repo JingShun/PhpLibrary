@@ -32,9 +32,9 @@ class SendMailHelper {
         $mail->SMTPAuth   = true; // Enable SMTP authentication
         $mail->SMTPAutoTLS = false;
 
-        $mail->Username   = 'bearchang@mail.tainan.gov.tw'; // SMTP username
-        $mail->Password   = 'icsT1513may84!!'; // SMTP password
-        $mail->setFrom('bearchang@mail.tainan.gov.tw', '張景舜');
+        $mail->Username   = '**************'; // SMTP username
+        $mail->Password   = '***********'; // SMTP password
+        $mail->setFrom($mail->Username, '阿舜');
 
         $mail->CharSet = 'utf8'; // 設定郵件編碼
         $mail->isHTML(true);// Set email format to HTML
