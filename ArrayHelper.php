@@ -241,8 +241,13 @@ class ArrayHelper
         
         $sum = 0;
         foreach ($this->arr as $fields) {
-            foreach ($fields as $value) {
-                $sum += is_numeric($value) ? $value : 0;
+            if(is_array($fields)){
+                foreach ($fields as $value) {
+                    $sum += is_numeric($value) ? $value : 0;
+                }
+            }
+            else {
+                $sum += is_numeric($fields) ? $fields : 0;
             }
         }
         return $sum;
